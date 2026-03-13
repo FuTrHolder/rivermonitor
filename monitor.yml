@@ -1,0 +1,83 @@
+name: River Airdrop Monitor
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Monitor and Respond to Commands
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: |
+          python3 << 'PYEOF'
+          import urllib.request
+          import json
+          import os
+          from datetime import datetime, timezone, timedelta
+
+          TARGET = 0.01
+          COND = 'gte'
+          TG_TOKEN = os.environ['TG_TOKEN']
+          CHAT_ID = os.environ['CHAT_ID']
+          KST = timezone(timedelta(hours=9))
+
+          def send_telegram(msg):
+              url = 'https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage'
+              body = json.dumps({'chat_id': CHAT_ID, 'text': msg, 'parse_mode': 'HTML'}).encode()
+              req = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json'}, method='POST')
+              urllib.request.urlopen(req)
+
+          def get_updates():
+              url = 'https://api.telegram.org/bot' + TG_TOKEN + '/getUpdates?offset=-5&limit=5'
+              with urllib.request.urlopen(url) as res:
+                  return json.loads(res.read())
+
+          def fetch_rate():
+              url = 'https://api-airdrop.river.inc/s2/pts-conversion-chart?interval=1d'
+              req = urllib.request.Request(url, headers={'Cache-Control': 'no-store'})
+              with urllib.request.urlopen(req) as res:
+                  data = json.loads(res.read())
+              valid = [x for x in data['data'] if x['actualRate'] is not None]
+              last = valid[-1]
+              return last['actualRate'], last['expectedRate']
+
+          now_kst = datetime.now(KST).strftime('%Y-%m-%d %H:%M:%S')
+          now_ts = datetime.now(timezone.utc).timestamp()
+
+          actual, ideal = fetch_rate()
+          print('actualRate=' + str(actual) + ' | idealRate=' + str(ideal) + ' | ' + now_kst)
+
+          hit = (COND == 'gte' and actual >= TARGET) or (COND == 'lte' and actual <= TARGET)
+          status = '목표 도달' if hit else '목표 미달성'
+          cond_str = '>=' if COND == 'gte' else '<='
+
+          updates = get_updates()
+          for update in updates.get('result', []):
+              msg = update.get('message', {})
+              text = msg.get('text', '')
+              msg_time = msg.get('date', 0)
+              if '/확인' in text and (now_ts - msg_time) < 360:
+                  reply = '📊 현재 River Airdrop 상태\n\n'
+                  reply += '• Actual Rate: ' + str(actual) + '\n'
+                  reply += '• Ideal Rate: ' + str(ideal) + '\n'
+                  reply += '• 목표: ' + str(TARGET) + ' (' + cond_str + ')\n'
+                  reply += '• 상태: ' + status + '\n'
+                  reply += '• 조회 시각: ' + now_kst
+                  send_telegram(reply)
+                  print('/확인 명령어 감지 -> 응답 전송')
+
+          if hit:
+              alert = '목표 도달!\n\n'
+              alert += 'actualRate = ' + str(actual) + '\n'
+              alert += '목표 = ' + str(TARGET) + '\n'
+              alert += '시각: ' + now_kst
+              send_telegram(alert)
+              print('목표 도달 알림 전송!')
+          else:
+              print('목표 미달성 (' + str(actual) + ' / ' + str(TARGET) + ')')
+          PYEOF

@@ -58,10 +58,24 @@ jobs:
           print("Ideal:", ideal)
 
           if actual >= TARGET:
-              message = f"🚨 River Airdrop 목표 도달!\\nActual: {actual}\\nTarget: {TARGET}"
-          else:
-              message = f"📊 River Update\\nActual: {actual}\\nIdeal: {ideal}\\nTarget: {TARGET}"
+              message = f"""
+🚨 River Airdrop 목표 도달!
 
+Actual Rate : {actual}
+Target      : {TARGET}
+
+🔥 목표 Actual Rate 달성
+"""
+          else:
+              message = f"""
+📊 River Update
+
+Actual Rate : {actual}
+Ideal Rate  : {ideal}
+Target      : {TARGET}
+
+⏱ Update every 5 minutes
+"""
           tg_url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
 
           body = json.dumps({

@@ -17,29 +17,16 @@ steps:
   - name: Install python packages
     run: pip3 install matplotlib
 
-  - name: Restore previous rate
-    id: cache
-    uses: actions/cache@v4
-    with:
-      path: last_rate.json
-      key: river-rate-cache
-
   - name: Run monitor
     run: |
       python3 << 'EOF'
       import urllib.request
       import json
-      import os
-      import datetime
       import matplotlib.pyplot as plt
 
-      TARGET = 0.01
-      TG_TOKEN = '${{ secrets.TG_TOKEN }}'
-      CHAT_ID = '${{ secrets.CHAT_ID }}'
+      url = "https://api-airdrop.river.inc/s2/pts-conversion-chart?interval=1d"
 
-      API = "https://api-airdrop.river.inc/s2/pts-conversion-chart?interval=1d"
-
-      req = urllib.request.Request(API, headers={'Cache-Control': 'no-store'})
+      req = urllib.request.Request(url, headers={'Cache-Control':'no-store'})
       with urllib.request.urlopen(req) as res:
           data = json.loads(res.read())
 
@@ -48,114 +35,15 @@ steps:
       actual_rates = [x["actualRate"] for x in rows]
       ideal_rates = [x["expectedRate"] for x in rows]
 
-      last = rows[-1]
-      actual = last["actualRate"]
-      ideal = last["expectedRate"]
+      actual = actual_rates[-1]
+      ideal = ideal_rates[-1]
 
-      print("actualRate:", actual)
-
-      # 이전값 로드
-      prev = None
-      if os.path.exists("last_rate.json"):
-          with open("last_rate.json") as f:
-              prev = json.load(f).get("actualRate")
-
-      changed = prev != actual
-      target_hit = actual >= TARGET
-
-      # 그래프 생성
       plt.figure()
       plt.plot(actual_rates)
       plt.plot(ideal_rates)
-      plt.title("River actualRate vs idealRate")
-      plt.xlabel("time index")
-      plt.ylabel("rate")
+      plt.title("River actual vs ideal")
+      plt.savefig("chart.png")
 
-      plt.savefig("rate_chart.png")
-
-      now = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-
-      def send_photo(msg):
-          boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
-          data = []
-
-          data.append('--' + boundary)
-          data.append('Content-Disposition: form-data; name="chat_id"')
-          data.append('')
-          data.append(CHAT_ID)
-
-          data.append('--' + boundary)
-          data.append('Content-Disposition: form-data; name="caption"')
-          data.append('')
-          data.append(msg)
-
-          data.append('--' + boundary)
-          data.append('Content-Disposition: form-data; name="photo"; filename="chart.png"')
-          data.append('Content-Type: image/png')
-          data.append('')
-
-          body_pre = '\r\n'.join(data).encode()
-
-          with open("rate_chart.png","rb") as f:
-              photo = f.read()
-
-          body_post = ('\r\n--' + boundary + '--\r\n').encode()
-
-          body = body_pre + photo + body_post
-
-          url = f"https://api.telegram.org/bot{TG_TOKEN}/sendPhoto"
-
-          req = urllib.request.Request(
-              url,
-              data=body,
-              headers={'Content-Type': f'multipart/form-data; boundary={boundary}'},
-              method="POST"
-          )
-
-          urllib.request.urlopen(req)
-
-      if changed:
-          msg = f"""
-```
-
-🌊 River Rate Update
-
-시간: {now}
-
-actualRate: {actual}
-idealRate: {ideal}
-
-이전값: {prev}
-"""
-send_photo(msg)
-print("Chart sent")
-
-```
-      if target_hit:
-          msg = f"""
-```
-
-🚨 River 목표 도달!
-
-actualRate = {actual}
-목표 = {TARGET}
-"""
-send_photo(msg)
-print("Target alert sent")
-
-```
-      with open("last_rate.json","w") as f:
-          json.dump({"actualRate": actual}, f)
-
+      print("actualRate:", actual)
       EOF
-
-  - name: Save cache
-    uses: actions/cache/save@v4
-    with:
-      path: last_rate.json
-      key: river-rate-cache
 ```
-
-          else:
-              print(f'목표 미달성 ({actual} / {TARGET})')
-          EOF

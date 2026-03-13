@@ -1,8 +1,8 @@
-name: River Airdrop Monitor
+name: River Monitor
 
 on:
 schedule:
-- cron: '*/5 * * * *'
+- cron: "*/5 * * * *"
 workflow_dispatch:
 
 jobs:
@@ -11,39 +11,39 @@ runs-on: ubuntu-latest
 
 ```
 steps:
-  - name: Checkout repo
+  - name: Checkout
     uses: actions/checkout@v4
 
-  - name: Install python packages
+  - name: Install matplotlib
     run: pip3 install matplotlib
 
-  - name: Run monitor
+  - name: Run monitor script
     run: |
-      python3 << 'EOF'
+      python3 <<EOF
       import urllib.request
       import json
       import matplotlib.pyplot as plt
 
       url = "https://api-airdrop.river.inc/s2/pts-conversion-chart?interval=1d"
 
-      req = urllib.request.Request(url, headers={'Cache-Control':'no-store'})
-      with urllib.request.urlopen(req) as res:
-          data = json.loads(res.read())
+      req = urllib.request.Request(url, headers={"Cache-Control":"no-store"})
+      res = urllib.request.urlopen(req)
 
-      rows = [x for x in data["data"] if x["actualRate"] is not None]
+      data = json.loads(res.read())
+
+      rows = [x for x in data["data"] if x["actualRate"] != None]
 
       actual_rates = [x["actualRate"] for x in rows]
       ideal_rates = [x["expectedRate"] for x in rows]
 
-      actual = actual_rates[-1]
-      ideal = ideal_rates[-1]
+      print("actualRate:", actual_rates[-1])
 
       plt.figure()
       plt.plot(actual_rates)
       plt.plot(ideal_rates)
-      plt.title("River actual vs ideal")
+      plt.title("River Rate")
       plt.savefig("chart.png")
 
-      print("actualRate:", actual)
+      print("chart generated")
       EOF
 ```

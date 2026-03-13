@@ -8,12 +8,11 @@ on:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
 
     steps:
-      - name: Run River Monitor
+      - name: Create monitor script
         run: |
-          python3 <<EOF
+          cat << 'PYTHON' > monitor.py
           import urllib.request
           import json
           import time
@@ -25,7 +24,7 @@ jobs:
           API_URL = "https://api-airdrop.river.inc/s2/pts-conversion-chart?interval=1d"
 
           def get_data():
-              for i in range(3):  # API 실패 대비 3회 재시도
+              for i in range(3):
                   try:
                       req = urllib.request.Request(API_URL, headers={"Cache-Control":"no-store"})
                       with urllib.request.urlopen(req, timeout=10) as res:
@@ -43,7 +42,7 @@ jobs:
 
           valid = [x for x in data["data"] if x["actualRate"] is not None]
 
-          if len(valid) == 0:
+          if not valid:
               print("No valid data")
               exit()
 
@@ -52,28 +51,13 @@ jobs:
           actual = float(last["actualRate"])
           ideal = float(last["expectedRate"])
 
-          print("actualRate:", actual)
-          print("idealRate:", ideal)
+          print("Actual:", actual)
+          print("Ideal:", ideal)
 
           if actual >= TARGET:
-              message = f"""
-🚨 River Airdrop 목표 도달
-
-Actual Rate : {actual}
-Target      : {TARGET}
-
-🔥 목표 Actual Rate 달성
-"""
+              message = f"🚨 River Airdrop 목표 도달!\\nActual: {actual}\\nTarget: {TARGET}"
           else:
-              message = f"""
-📊 River Airdrop Update
-
-Actual Rate : {actual}
-Ideal Rate  : {ideal}
-Target      : {TARGET}
-
-⏱ Auto update every 5 minutes
-"""
+              message = f"📊 River Update\\nActual: {actual}\\nIdeal: {ideal}\\nTarget: {TARGET}"
 
           tg_url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
 
@@ -82,16 +66,17 @@ Target      : {TARGET}
               "text": message
           }).encode()
 
-          try:
-              req = urllib.request.Request(
-                  tg_url,
-                  data=body,
-                  headers={"Content-Type":"application/json"},
-                  method="POST"
-              )
-              urllib.request.urlopen(req)
-              print("Telegram sent")
-          except Exception as e:
-              print("Telegram error:", e)
+          req = urllib.request.Request(
+              tg_url,
+              data=body,
+              headers={"Content-Type": "application/json"},
+              method="POST"
+          )
 
-          EOF
+          urllib.request.urlopen(req)
+
+          print("Telegram message sent")
+          PYTHON
+
+      - name: Run monitor
+        run: python3 monitor.py

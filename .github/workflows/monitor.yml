@@ -1,9 +1,9 @@
 name: River Airdrop Monitor
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'  # 5분마다 실행
-  workflow_dispatch:      # 수동 실행 버튼
+  repository_dispatch:     # 외부에서 보내는 신호를 받음
+    types: [run_monitor]
+  workflow_dispatch:       # 수동 실행 버튼 유지
 
 jobs:
   monitor:

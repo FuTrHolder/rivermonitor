@@ -13,9 +13,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Create monitor script
+      - name: Run monitor
         run: |
-          cat << 'PYTHON' > monitor.py
+          python3 - <<EOF
           import urllib.request
           import json
           import time
@@ -26,27 +26,27 @@ jobs:
 
           API_URL = "https://api-airdrop.river.inc/s2/pts-conversion-chart?interval=1d"
 
-          def get_data():
+          def fetch():
               for i in range(3):
                   try:
-                      req = urllib.request.Request(API_URL, headers={"Cache-Control":"no-store"})
+                      req = urllib.request.Request(API_URL, headers={"Cache-Control": "no-store"})
                       with urllib.request.urlopen(req, timeout=10) as res:
                           return json.loads(res.read())
                   except Exception as e:
-                      print("API retry:", e)
+                      print("retry", e)
                       time.sleep(2)
               return None
 
-          data = get_data()
+          data = fetch()
 
           if not data:
-              print("API failed")
+              print("API error")
               exit()
 
           valid = [x for x in data["data"] if x["actualRate"] is not None]
 
           if not valid:
-              print("No valid data")
+              print("no data")
               exit()
 
           last = valid[-1]
@@ -54,8 +54,8 @@ jobs:
           actual = float(last["actualRate"])
           ideal = float(last["expectedRate"])
 
-          print("Actual:", actual)
-          print("Ideal:", ideal)
+          print("actual:", actual)
+          print("ideal:", ideal)
 
           if actual >= TARGET:
               message = f"""
@@ -74,10 +74,10 @@ Actual Rate : {actual:.6f}
 Ideal Rate  : {ideal:.6f}
 Target      : {TARGET}
 
-⏱ Auto update every 5 minutes
+⏱ Update every 5 minutes
 """
 
-          tg_url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
+          url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
 
           body = json.dumps({
               "chat_id": CHAT_ID,
@@ -85,7 +85,7 @@ Target      : {TARGET}
           }).encode()
 
           req = urllib.request.Request(
-              tg_url,
+              url,
               data=body,
               headers={"Content-Type": "application/json"},
               method="POST"
@@ -93,8 +93,5 @@ Target      : {TARGET}
 
           urllib.request.urlopen(req)
 
-          print("Telegram message sent")
-          PYTHON
-
-      - name: Run monitor
-        run: python3 monitor.py
+          print("telegram sent")
+          EOF

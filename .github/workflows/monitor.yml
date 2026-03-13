@@ -61,21 +61,22 @@ jobs:
               message = f"""
 🚨 River Airdrop 목표 도달!
 
-Actual Rate : {actual}
+Actual Rate : {actual:.6f}
 Target      : {TARGET}
 
-🔥 목표 Actual Rate 달성
+🔥 Target reached
 """
           else:
               message = f"""
-📊 River Update
+📊 River Conversion Update
 
-Actual Rate : {actual}
-Ideal Rate  : {ideal}
+Actual Rate : {actual:.6f}
+Ideal Rate  : {ideal:.6f}
 Target      : {TARGET}
 
-⏱ Update every 5 minutes
+⏱ Auto update every 5 minutes
 """
+
           tg_url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
 
           body = json.dumps({

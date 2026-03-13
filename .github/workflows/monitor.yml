@@ -8,50 +8,90 @@ on:
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
-      - name: Check Rate
+      - name: Run River Monitor
         run: |
           python3 <<EOF
           import urllib.request
           import json
+          import time
 
           TARGET = 0.01
           TG_TOKEN = "${{ secrets.TG_TOKEN }}"
           CHAT_ID = "${{ secrets.CHAT_ID }}"
 
-          url = "https://api-airdrop.river.inc/s2/pts-conversion-chart?interval=1d"
+          API_URL = "https://api-airdrop.river.inc/s2/pts-conversion-chart?interval=1d"
 
-          req = urllib.request.Request(url)
-          res = urllib.request.urlopen(req)
-          data = json.loads(res.read())
+          def get_data():
+              for i in range(3):  # API 실패 대비 3회 재시도
+                  try:
+                      req = urllib.request.Request(API_URL, headers={"Cache-Control":"no-store"})
+                      with urllib.request.urlopen(req, timeout=10) as res:
+                          return json.loads(res.read())
+                  except Exception as e:
+                      print("API retry:", e)
+                      time.sleep(2)
+              return None
+
+          data = get_data()
+
+          if not data:
+              print("API failed")
+              exit()
 
           valid = [x for x in data["data"] if x["actualRate"] is not None]
+
+          if len(valid) == 0:
+              print("No valid data")
+              exit()
+
           last = valid[-1]
 
           actual = float(last["actualRate"])
           ideal = float(last["expectedRate"])
 
+          print("actualRate:", actual)
+          print("idealRate:", ideal)
+
           if actual >= TARGET:
-              msg = f"🚨 River Airdrop 목표 도달!\\nActual: {actual}\\nTarget: {TARGET}"
+              message = f"""
+🚨 River Airdrop 목표 도달
+
+Actual Rate : {actual}
+Target      : {TARGET}
+
+🔥 목표 Actual Rate 달성
+"""
           else:
-              msg = f"📊 River Update\\nActual: {actual}\\nIdeal: {ideal}"
+              message = f"""
+📊 River Airdrop Update
+
+Actual Rate : {actual}
+Ideal Rate  : {ideal}
+Target      : {TARGET}
+
+⏱ Auto update every 5 minutes
+"""
 
           tg_url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
 
           body = json.dumps({
               "chat_id": CHAT_ID,
-              "text": msg
+              "text": message
           }).encode()
 
-          req2 = urllib.request.Request(
-              tg_url,
-              data=body,
-              headers={"Content-Type": "application/json"},
-              method="POST"
-          )
+          try:
+              req = urllib.request.Request(
+                  tg_url,
+                  data=body,
+                  headers={"Content-Type":"application/json"},
+                  method="POST"
+              )
+              urllib.request.urlopen(req)
+              print("Telegram sent")
+          except Exception as e:
+              print("Telegram error:", e)
 
-          urllib.request.urlopen(req2)
-
-          print("telegram sent")
           EOF

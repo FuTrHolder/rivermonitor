@@ -62,12 +62,12 @@ jobs:
               text = msg.get('text', '')
               msg_time = msg.get('date', 0)
               if '/확인' in text and (now_ts - msg_time) < 360:
-                  reply = '📊 현재 River Airdrop 상태\n\n'
-                  reply += '• Actual Rate: ' + str(actual) + '\n'
-                  reply += '• Ideal Rate: ' + str(ideal) + '\n'
-                  reply += '• 목표: ' + str(TARGET) + ' (' + cond_str + ')\n'
-                  reply += '• 상태: ' + status + '\n'
-                  reply += '• 조회 시각: ' + now_kst
+                  reply = '현재 River Airdrop 상태\n\n'
+                  reply += 'Actual Rate: ' + str(actual) + '\n'
+                  reply += 'Ideal Rate: ' + str(ideal) + '\n'
+                  reply += '목표: ' + str(TARGET) + ' (' + cond_str + ')\n'
+                  reply += '상태: ' + status + '\n'
+                  reply += '조회 시각: ' + now_kst
                   send_telegram(reply)
                   print('/확인 명령어 감지 -> 응답 전송')
 

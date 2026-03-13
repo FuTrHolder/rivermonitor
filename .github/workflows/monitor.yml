@@ -1,8 +1,5 @@
 name: River Airdrop Monitor
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -13,10 +10,44 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check Actual Rate
+        run: |
+          python3 -c "
+import urllib.request, json
 
-      - name: Run monitor
-        run: python3 monitor.py
-        env:
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
+TARGET = 0.01
+TG_TOKEN = '${{ secrets.TG_TOKEN }}'
+CHAT_ID = '${{ secrets.CHAT_ID }}'
+
+url = 'https://api-airdrop.river.inc/s2/pts-conversion-chart?interval=1d'
+data = json.loads(urllib.request.urlopen(url).read())
+
+valid = [x for x in data['data'] if x['actualRate'] is not None]
+last = valid[-1]
+
+actual = float(last['actualRate'])
+ideal = float(last['expectedRate'])
+
+if actual >= TARGET:
+    msg = f'🚨 River Airdrop 목표 도달!\\n\\nActual Rate: {actual:.6f}\\nTarget: {TARGET}'
+else:
+    msg = f'📊 River Update\\n\\nActual Rate: {actual:.6f}\\nIdeal Rate: {ideal:.6f}\\nTarget: {TARGET}'
+
+tg = f'https://api.telegram.org/bot{TG_TOKEN}/sendMessage'
+
+body = json.dumps({
+ 'chat_id': CHAT_ID,
+ 'text': msg
+}).encode()
+
+req = urllib.request.Request(
+ tg,
+ data=body,
+ headers={'Content-Type':'application/json'},
+ method='POST'
+)
+
+urllib.request.urlopen(req)
+
+print('telegram sent')
+"
